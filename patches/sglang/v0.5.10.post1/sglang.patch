@@ -589,7 +589,7 @@ index 496cd9665..45ceb0e20 100644
  
                      if req.grammar is not None:
                          # FIXME: this try-except block is for handling unexpected xgrammar issue.
-@@ -893,6 +894,75 @@ class SchedulerOutputProcessorMixin:
+@@ -893,6 +894,106 @@ class SchedulerOutputProcessorMixin:
          if req.input_token_ids_logprobs_idx is None:
              req.input_token_ids_logprobs_idx = []
  
