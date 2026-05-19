@@ -176,6 +176,11 @@ class MooncakeConfig:
         os.environ["MOONCAKE_PROTOCOL"] = self.protocol
         os.environ["MOONCAKE_DEVICE_NAME"] = self.device_name
         os.environ["MOONCAKE_ENABLE_GPU_DIRECT"] = "1" if self.enable_gpu_direct else "0"
+        # Fix: https://github.com/kvcache-ai/Mooncake/issues/1986
+        if self.protocol.lower() == "tcp" and "MC_STORE_MEMCPY" not in os.environ:
+            # Mooncake's TCP-only memcpy fast path can segfault in same-host
+            # multi-process get paths. Preserve an explicit user override.
+            os.environ["MC_STORE_MEMCPY"] = "0"
         if self.async_put_pool_size is not None:
             os.environ["MOONCAKE_ASYNC_PUT_POOL_SIZE"] = str(self.async_put_pool_size)
         os.environ["MOONCAKE_STORE_FULL_WAIT_SECONDS"] = str(self.store_full_wait_seconds)
