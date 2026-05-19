@@ -58,6 +58,8 @@ from torchspec.utils.logging import logger, print_with_rank
 
 def _rope_config_get(rope_scaling, key, default=None):
     """Get a value from rope_scaling config (dict or object)."""
+    if rope_scaling is None:
+        return default
     if isinstance(rope_scaling, dict):
         return rope_scaling.get(key, default)
     return getattr(rope_scaling, key, default)
@@ -159,16 +161,16 @@ class DeepSeekMLAAttention(nn.Module):
         rope_dim = self.qk_rope_head_dim
         rope_scaling = self.config.rope_scaling
         rope_theta = getattr(self.config, "rope_theta", 10000)
-
-        if rope_scaling is None:
+        rget = partial(_rope_config_get, rope_scaling)
+        scaling_type = rget("rope_type", rget("type"))
+        
+        if rope_scaling is None or scaling_type == "default":
             self.rotary_emb = LlamaRotaryEmbedding(
                 rope_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 base=rope_theta,
             )
         else:
-            rget = partial(_rope_config_get, rope_scaling)
-            scaling_type = rget("rope_type", rget("type"))
             scaling_factor = rget("factor")
 
             if scaling_type in (None, "default"):
