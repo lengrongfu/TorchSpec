@@ -163,7 +163,7 @@ class DeepSeekMLAAttention(nn.Module):
         rope_theta = getattr(self.config, "rope_theta", 10000)
         rget = partial(_rope_config_get, rope_scaling)
         scaling_type = rget("rope_type", rget("type"))
-        
+
         if rope_scaling is None or scaling_type == "default":
             self.rotary_emb = LlamaRotaryEmbedding(
                 rope_dim,

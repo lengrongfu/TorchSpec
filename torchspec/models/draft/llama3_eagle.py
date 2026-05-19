@@ -1163,6 +1163,7 @@ class LlamaAttention(nn.Module):
             if isinstance(rope_scaling, dict):
                 return rope_scaling.get(key, default)
             return getattr(rope_scaling, key, default)
+
         scaling_type = rope_get("rope_type", rope_get("type"))
 
         if rope_scaling is None or scaling_type == "default":
