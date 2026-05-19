@@ -35,6 +35,7 @@ from torchspec.models.ops.flex_attention import (
     compile_friendly_flex_attention,
     eagle3_block_mask,
     generate_eagle3_mask,
+    p_eagle_block_mask,
 )
 from torchspec.utils.distributed import get_sp_ring_group, get_sp_ulysses_group
 from torchspec.utils.logging import logger, print_with_rank
@@ -1409,14 +1410,25 @@ class LlamaFlexAttention(LlamaAttention):
 
         flex_attention_func = flex_attention if q_len <= 128 else compile_friendly_flex_attention
 
-        block_mask = eagle3_block_mask(
-            Q_LEN=q_len,
-            KV_LEN=key_cache.shape[-2],
-            B=bsz,
-            H=1,  # Rely on broadcast
-            device=query_states.device,
-            lck=lck,
-        )
+        if getattr(self.config, "draft_training_mode", "eagle3") == "p_eagle":
+            depth = int(getattr(self.config, "p_eagle_depth"))
+            block_mask = p_eagle_block_mask(
+                Q_LEN=q_len,
+                KV_LEN=key_cache.shape[-2],
+                depth=depth,
+                B=bsz,
+                H=1,  # Rely on broadcast
+                device=query_states.device,
+            )
+        else:
+            block_mask = eagle3_block_mask(
+                Q_LEN=q_len,
+                KV_LEN=key_cache.shape[-2],
+                B=bsz,
+                H=1,  # Rely on broadcast
+                device=query_states.device,
+                lck=lck,
+            )
         attn_output = flex_attention_func(
             query=query_states,
             key=key_cache.contiguous(),

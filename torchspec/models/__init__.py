@@ -26,10 +26,22 @@ from torchspec.models.eagle3 import (
 )
 from torchspec.models.ops.loss import compiled_forward_kl_loss
 from torchspec.models.ops.loss_mask import compute_assistant_loss_mask
+from torchspec.models.p_eagle import (
+    PEagleModel,
+    build_p_eagle_inputs,
+    build_p_eagle_lazy_target,
+    build_p_eagle_precomputed_target,
+    build_p_eagle_target_hidden_states,
+)
 
 __all__ = [
     "Eagle3Model",
+    "PEagleModel",
     "DFlashModel",
+    "build_p_eagle_inputs",
+    "build_p_eagle_lazy_target",
+    "build_p_eagle_precomputed_target",
+    "build_p_eagle_target_hidden_states",
     "compute_lazy_target_padded",
     "compute_target_p_padded",
     "compiled_forward_kl_loss",

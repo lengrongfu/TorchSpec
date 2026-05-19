@@ -139,6 +139,50 @@ def generate_eagle3_mask(Q_LEN: int, KV_LEN: int, lck: int = 0):
     return mask_mod
 
 
+def generate_p_eagle_mask(Q_LEN: int, KV_LEN: int, depth: int):
+    """P-EAGLE mask over a flattened (position, depth) grid.
+
+    A query can attend to depth-0 tokens from previous source positions and to
+    same-position states up to its own depth. This prevents future-position and
+    deeper same-position leakage while keeping the full prefix context.
+    """
+
+    def p_eagle_mask(b, h, q_idx, kv_idx):
+        q_pos = q_idx // depth
+        q_depth = q_idx % depth
+        kv_pos = kv_idx // depth
+        kv_depth = kv_idx % depth
+        prefix_context = (kv_pos < q_pos) & (kv_depth == 0)
+        same_position = (kv_pos == q_pos) & (kv_depth <= q_depth)
+        return (kv_idx < KV_LEN) & (q_idx < Q_LEN) & (prefix_context | same_position)
+
+    p_eagle_mask.__name__ = f"p_eagle_mask_Q_{Q_LEN}_KV_{KV_LEN}_D_{depth}"
+    return p_eagle_mask
+
+
+def p_eagle_block_mask(
+    Q_LEN: int,
+    KV_LEN: int,
+    depth: int,
+    *,
+    B: int = 1,
+    H: int = 1,
+    device: torch.device = "cuda",
+    BLOCK_SIZE: "int | tuple[int, int]" = 128,
+) -> "BlockMask":
+    Q_BS, KV_BS = _normalize_block_size(BLOCK_SIZE)
+    creator = create_block_mask if Q_LEN <= 128 else compile_friendly_create_block_mask
+    return creator(
+        mask_mod=generate_p_eagle_mask(Q_LEN=Q_LEN, KV_LEN=KV_LEN, depth=depth),
+        B=B,
+        H=H,
+        Q_LEN=Q_LEN,
+        KV_LEN=KV_LEN,
+        device=device,
+        BLOCK_SIZE=(Q_BS, KV_BS),
+    )
+
+
 def _build_eagle3_block_mask_tensors(
     Q_LEN: int,
     KV_LEN: int,

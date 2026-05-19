@@ -20,13 +20,14 @@
 
 """TorchSpec - Torch native spec decode training framework."""
 
-from torchspec.models import Eagle3Model
+from torchspec.models import Eagle3Model, PEagleModel
 from torchspec.models.dflash import DFlashModel
 from torchspec.models.draft import AutoDraftModelConfig, AutoEagle3DraftModel
 from torchspec.models.draft.dflash import DFlashConfig, DFlashDraftModel
 
 __all__ = [
     "Eagle3Model",
+    "PEagleModel",
     "DFlashModel",
     "DFlashConfig",
     "DFlashDraftModel",

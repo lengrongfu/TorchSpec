@@ -24,8 +24,13 @@ from typing import List, Optional, Tuple
 import torch
 import torch.distributed as dist
 
-from torchspec import AutoDraftModelConfig, AutoEagle3DraftModel, Eagle3Model
+from torchspec import AutoDraftModelConfig, AutoEagle3DraftModel, Eagle3Model, PEagleModel
 from torchspec.models.eagle3 import compute_lazy_target_padded, compute_target_p_padded
+from torchspec.models.p_eagle import (
+    build_p_eagle_inputs,
+    build_p_eagle_lazy_target,
+    build_p_eagle_precomputed_target,
+)
 from torchspec.training import checkpoint
 from torchspec.training.fsdp import apply_fsdp2, fsdp2_load_full_state_dict
 from torchspec.training.optimizer import BF16Optimizer
@@ -101,12 +106,29 @@ class Eagle3Trainer(Trainer):
             f"{frozen_count:,} frozen (embedding) parameters"
         )
 
-        eagle3_model = Eagle3Model(
-            draft_model=draft_model,
-            length=self.args.ttt_length,
-            attention_backend=self.args.attention_backend,
-            gradient_checkpointing=getattr(self.args, "gradient_checkpointing", True),
-        )
+        draft_training_mode = getattr(self.args, "draft_training_mode", "eagle3")
+        if draft_training_mode == "p_eagle":
+            p_eagle_depth = int(getattr(self.args, "p_eagle_depth", None) or self.args.ttt_length)
+            mask_token_id = getattr(self.args, "p_eagle_mask_token_id", None)
+            if mask_token_id is None:
+                mask_token_id = getattr(draft_model.config, "pad_token_id", None) or 0
+            draft_model.config.p_eagle_mask_token_id = int(mask_token_id)
+            draft_model.config.ptd_token_id = int(mask_token_id)
+            eagle3_model = PEagleModel(
+                draft_model=draft_model,
+                depth=p_eagle_depth,
+                attention_backend=self.args.attention_backend,
+                gradient_checkpointing=getattr(self.args, "gradient_checkpointing", True),
+                mask_token_id=mask_token_id,
+                chunk_size=getattr(self.args, "p_eagle_chunk_size", 0),
+            )
+        else:
+            eagle3_model = Eagle3Model(
+                draft_model=draft_model,
+                length=self.args.ttt_length,
+                attention_backend=self.args.attention_backend,
+                gradient_checkpointing=getattr(self.args, "gradient_checkpointing", True),
+            )
 
         full_state = eagle3_model.state_dict() if dist.get_rank() == 0 else {}
 
@@ -285,7 +307,37 @@ class Eagle3Trainer(Trainer):
             loss_mask = loss_mask.squeeze(-1)
         loss_mask = loss_mask.cuda()
 
-        if self.t2d is not None:
+        if getattr(self.args, "draft_training_mode", "eagle3") == "p_eagle":
+            depth = int(getattr(self.args, "p_eagle_depth", None) or self.eagle3.length)
+            mask_token_id = getattr(self.args, "p_eagle_mask_token_id", None)
+            if mask_token_id is None:
+                mask_token_id = getattr(self.draft_model.config, "pad_token_id", None) or 0
+            expanded_for_mask = build_p_eagle_inputs(
+                input_ids=input_ids,
+                hidden_states=target_hidden_states,
+                loss_mask=loss_mask,
+                depth=depth,
+                mask_token_id=mask_token_id,
+                attention_mask=batch["attention_mask"].cuda(),
+                position_ids=batch.get("position_ids").cuda()
+                if batch.get("position_ids") is not None
+                else None,
+            )
+            if self.t2d is not None:
+                target = build_p_eagle_precomputed_target(
+                    target_hidden_states=target_hidden_states,
+                    target_lm_head_weight=self.target_lm_head_weight,
+                    t2d=self.t2d,
+                    loss_mask=expanded_for_mask.loss_mask,
+                    depth=depth,
+                )
+            else:
+                target = build_p_eagle_lazy_target(
+                    target_hidden_states,
+                    self.target_lm_head_weight,
+                    depth,
+                )
+        elif self.t2d is not None:
             target = compute_target_p_padded(
                 target_hidden_states=target_hidden_states,
                 target_lm_head_weight=self.target_lm_head_weight,

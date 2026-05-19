@@ -134,7 +134,11 @@ class TrainingConfig:
     train_with_decode: bool = False
     training_num_gpus_per_node: int = 1
     training_num_nodes: int = 1
+    draft_training_mode: str = "eagle3"  # "eagle3" or "p_eagle"
     ttt_length: int = 7
+    p_eagle_depth: int = 7
+    p_eagle_mask_token_id: Optional[int] = None
+    p_eagle_chunk_size: int = 0
     # Per-position TTT loss weights. If unset, defaults to [0.8**i for i in range(ttt_length)].
     # Length must equal ttt_length when supplied.
     ploss_weights: Optional[list[float]] = None
@@ -235,6 +239,36 @@ def _validate_vllm_config(config: DictConfig) -> None:
             raise NotImplementedError(f"{label} is not yet supported with the vllm backend!")
 
 
+def _validate_training_config(config: DictConfig) -> None:
+    mode = OmegaConf.select(config, "training.draft_training_mode", default="eagle3")
+    if mode not in {"eagle3", "p_eagle"}:
+        raise ValueError("training.draft_training_mode must be 'eagle3' or 'p_eagle'")
+
+    depth = OmegaConf.select(config, "training.p_eagle_depth", default=None)
+    if depth is None:
+        depth = OmegaConf.select(config, "training.ttt_length")
+        OmegaConf.update(config, "training.p_eagle_depth", depth)
+    if int(depth) <= 0:
+        raise ValueError("training.p_eagle_depth must be positive")
+
+    chunk_size = OmegaConf.select(config, "training.p_eagle_chunk_size", default=0)
+    if int(chunk_size) < 0:
+        raise ValueError("training.p_eagle_chunk_size must be non-negative")
+
+    attention_backend = OmegaConf.select(config, "training.attention_backend")
+    if mode == "p_eagle" and attention_backend in {"usp", "fa4"}:
+        raise NotImplementedError(
+            f"P-EAGLE training does not yet support attention_backend={attention_backend}"
+        )
+    if (
+        mode == "p_eagle"
+        and OmegaConf.select(config, "training.p_eagle_mask_token_id", default=None) is None
+    ):
+        raise ValueError(
+            "training.p_eagle_mask_token_id must be set for vLLM parallel drafting export"
+        )
+
+
 def _save_config_snapshot(config: DictConfig) -> None:
     """Save the resolved config to output_dir/config.yaml if output_dir is set."""
     output_dir = OmegaConf.select(config, "output_dir", default=None)
@@ -278,6 +312,7 @@ def load_config(
     config = OmegaConf.merge(*configs_to_merge)
     _resolve_relative_paths(config, os.getcwd())
 
+    _validate_training_config(config)
     _validate_vllm_config(config)
 
     if save_snapshot:

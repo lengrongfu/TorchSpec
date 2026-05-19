@@ -73,6 +73,15 @@ Override config values directly from the CLI:
 ./examples/qwen3-8b-single-node/run.sh training.learning_rate=5e-5 training.num_train_steps=500
 ```
 
+To train a P-EAGLE draft model, use `training.draft_training_mode=p_eagle`.
+P-EAGLE expands each source position across `training.p_eagle_depth` parallel
+prediction depths and currently supports `sdpa` and `flex_attention` training
+backends:
+
+```bash
+python -m torchspec.train_entry --config configs/p_eagle_qwen3_8b.yaml
+```
+
 ## Setup
 
 ### Quick Setup

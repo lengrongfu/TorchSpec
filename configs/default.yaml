@@ -23,7 +23,11 @@ training:
   prefetch_depth: 2
   save_interval: 5000
   seed: 0
+  draft_training_mode: eagle3
   ttt_length: 7
+  p_eagle_depth: 7
+  p_eagle_mask_token_id: null
+  p_eagle_chunk_size: 0
   warmup_ratio: 0.015
 
 inference:
