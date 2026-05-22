@@ -34,7 +34,6 @@ from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 from torchspec.ray.train_group import RayTrainGroup
 from torchspec.utils.logging import logger
 
-
 # Ray exposes a tiny "node:<ip>" resource on each node. Requiring a fractional
 # amount pins a bundle to that node without consuming a full logical resource.
 _NODE_RESOURCE_EPSILON = 0.001

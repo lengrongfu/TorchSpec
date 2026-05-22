@@ -1,12 +1,11 @@
-from argparse import Namespace
 import importlib.util
 import sys
 import types
+from argparse import Namespace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 repo_root = Path(__file__).resolve().parents[1]
 torchspec_pkg = sys.modules.get("torchspec")
@@ -67,8 +66,8 @@ train_group_stub.RayTrainGroup = object
 sys.modules["torchspec.ray.train_group"] = train_group_stub
 
 from torchspec.ray.placement_group import (  # noqa: E402
-    _NodeConstraint,
     _build_custom_bundles,
+    _NodeConstraint,
     _sort_probed_bundle_infos,
     create_placement_groups,
 )
